@@ -1,0 +1,46 @@
+{
+  "accounts": {
+    "普通用户": [
+      {
+        "username": "test_user1",
+        "password": "user123456",
+        "role": "user",
+        "description": "普通用户测试账号1"
+      },
+      {
+        "username": "test_user2",
+        "password": "user234567",
+        "role": "user",
+        "description": "普通用户测试账号2"
+      }
+    ],
+    "创作者": [
+      {
+        "username": "test_creator1",
+        "password": "creator123456",
+        "role": "creator",
+        "description": "创作者测试账号1"
+      },
+      {
+        "username": "test_creator2",
+        "password": "creator234567",
+        "role": "creator",
+        "description": "创作者测试账号2"
+      }
+    ],
+    "审核管理员": [
+      {
+        "username": "test_admin1",
+        "password": "admin123456",
+        "role": "admin",
+        "description": "审核管理员测试账号1"
+      },
+      {
+        "username": "test_admin2",
+        "password": "admin234567",
+        "role": "admin",
+        "description": "审核管理员测试账号2"
+      }
+    ]
+  }
+} 

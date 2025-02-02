@@ -1,0 +1,17 @@
+src/
+  ├── assets/
+  ├── components/
+  │   ├── common/
+  │   │   ├── Header.vue
+  │   │   └── Footer.vue
+  │   └── article/
+  │       ├── ArticleCard.vue
+  │       └── ArticleList.vue
+  ├── views/
+  │   ├── Home.vue
+  │   ├── ArticleDetail.vue
+  │   └── CreateArticle.vue
+  ├── router/
+  │   └── index.js
+  └── store/
+      └── index.js 

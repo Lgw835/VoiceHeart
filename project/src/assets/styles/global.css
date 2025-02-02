@@ -1,0 +1,18 @@
+/* 全局样式设置，强制使用桌面端布局 */
+html {
+  min-width: 1200px;
+  overflow-x: auto;
+}
+
+body {
+  min-width: 1200px;
+  overflow-x: auto;
+}
+
+/* 禁用所有媒体查询 */
+@media (max-width: 1200px) {
+  html, body {
+    min-width: 1200px;
+    overflow-x: auto;
+  }
+} 
