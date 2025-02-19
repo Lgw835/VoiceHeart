@@ -58,8 +58,8 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="router.push('/user/profile')">个人中心</el-dropdown-item>
-                <el-dropdown-item @click="router.push('/create')">写文章</el-dropdown-item>
+                <el-dropdown-item @click="router.push('/profile')">个人中心</el-dropdown-item>
+                <el-dropdown-item @click="router.push('/create-article')">写文章</el-dropdown-item>
                 <el-dropdown-item v-if="isAdmin" @click="router.push('/admin/review')" class="review-item">
                   审核
                   <el-badge v-if="pendingCount > 0" :value="pendingCount" class="menu-badge" />
@@ -99,11 +99,13 @@ const searchKeyword = ref('')
 const router = useRouter()
 const userStore = useUserStore()
 const { isLoggedIn } = storeToRefs(userStore)
-const { userInfo } = storeToRefs(userStore)
+
+// 使用computed获取用户信息
+const userInfo = computed(() => userStore.user)
 
 // 判断是否为管理员
 const isAdmin = computed(() => {
-  return userInfo.value?.role === 'admin'
+  return userStore.isAdmin
 })
 
 const handleSearch = () => {

@@ -1,28 +1,19 @@
 <template>
-  <div class="login-page">
-    <el-card class="login-card">
-      <template #header>
-        <div class="card-header">
-          <el-radio-group v-model="activeTab">
-            <el-radio-button label="login">登录</el-radio-button>
-            <el-radio-button label="register">注册</el-radio-button>
-          </el-radio-group>
-        </div>
-      </template>
-
-      <!-- 登录表单 -->
+  <div class="login-container">
+    <div class="login-box">
+      <h2>登录</h2>
       <el-form
-        v-if="activeTab === 'login'"
         ref="loginFormRef"
         :model="loginForm"
         :rules="loginRules"
+        class="login-form"
         label-width="0"
       >
-        <el-form-item prop="username">
+        <el-form-item prop="email">
           <el-input
-            v-model="loginForm.username"
-            placeholder="用户名/邮箱"
-            :prefix-icon="UserFilled"
+            v-model="loginForm.email"
+            placeholder="邮箱"
+            :prefix-icon="Message"
           />
         </el-form-item>
         <el-form-item prop="password">
@@ -34,241 +25,135 @@
             show-password
           />
         </el-form-item>
-        <div class="form-actions">
+        <div class="remember-forgot">
           <el-checkbox v-model="rememberMe">记住我</el-checkbox>
           <el-link type="primary" :underline="false">忘记密码？</el-link>
         </div>
-        <el-button type="primary" class="submit-btn" @click="handleLogin">
+        <el-button 
+          type="primary" 
+          class="submit-btn" 
+          @click="handleLogin" 
+          :loading="loading"
+        >
           登录
         </el-button>
+        <div class="register-link">
+          还没有账号？
+          <router-link to="/register">立即注册</router-link>
+        </div>
       </el-form>
-
-      <!-- 注册表单 -->
-      <el-form
-        v-else
-        ref="registerFormRef"
-        :model="registerForm"
-        :rules="registerRules"
-        label-width="0"
-      >
-        <el-form-item prop="username">
-          <el-input
-            v-model="registerForm.username"
-            placeholder="用户名"
-            :prefix-icon="UserFilled"
-          />
-        </el-form-item>
-        <el-form-item prop="email">
-          <el-input
-            v-model="registerForm.email"
-            placeholder="邮箱"
-            :prefix-icon="Message"
-          />
-        </el-form-item>
-        <el-form-item prop="password">
-          <el-input
-            v-model="registerForm.password"
-            type="password"
-            placeholder="密码"
-            :prefix-icon="Lock"
-            show-password
-          />
-        </el-form-item>
-        <el-form-item prop="confirmPassword">
-          <el-input
-            v-model="registerForm.confirmPassword"
-            type="password"
-            placeholder="确认密码"
-            :prefix-icon="Lock"
-            show-password
-          />
-        </el-form-item>
-        <el-button type="primary" class="submit-btn" @click="handleRegister">
-          注册
-        </el-button>
-      </el-form>
-    </el-card>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { 
-  UserFilled,
-  Lock,
-  Message,
-} from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useUserStore } from '@/store/user'
-import testAccounts from '@/config/accounts.json'
+import { Lock, Message } from '@element-plus/icons-vue'
+import { useUserStore } from '../store/user'
 
 const router = useRouter()
 const route = useRoute()
-const activeTab = ref('login')
-const rememberMe = ref(false)
 const userStore = useUserStore()
 
-onMounted(() => {
-  // 从URL参数中获取tab
-  const tab = route.query.tab
-  if (tab === 'register') {
-    activeTab.value = 'register'
-  }
-})
-
-// 登录表单
-const loginFormRef = ref()
-const loginForm = reactive({
-  username: '',
+const loginFormRef = ref(null)
+const loginForm = ref({
+  email: '',
   password: ''
 })
+const loading = ref(false)
+const rememberMe = ref(false)
 
 const loginRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, message: '用户名长度不能小于3位', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
-  ]
-}
-
-// 注册表单
-const registerFormRef = ref()
-const registerForm = reactive({
-  username: '',
-  email: '',
-  password: '',
-  confirmPassword: ''
-})
-
-const validatePass2 = (rule, value, callback) => {
-  if (value === '') {
-    callback(new Error('请再次输入密码'))
-  } else if (value !== registerForm.password) {
-    callback(new Error('两次输入密码不一致!'))
-  } else {
-    callback()
-  }
-}
-
-const registerRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, message: '用户名长度不能小于3位', trigger: 'blur' }
-  ],
   email: [
-    { required: true, message: '请输入邮箱地址', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, message: '请再次输入密码', trigger: 'blur' },
-    { validator: validatePass2, trigger: 'blur' }
   ]
 }
 
-// 登录处理
-const handleLogin = () => {
-  loginFormRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        // 从测试账号配置中查找用户
-        const { accounts } = testAccounts
-        let foundUser = null
-        
-        // 遍历所有角色查找用户
-        for (const role in accounts) {
-          const user = accounts[role].find(
-            account => account.username === loginForm.username && 
-                      account.password === loginForm.password
-          )
-          if (user) {
-            foundUser = user
-            break
-          }
-        }
-
-        if (!foundUser) {
-          ElMessage.error('用户名或密码错误')
-          return
-        }
-
-        // 设置用户信息
-        const userInfo = {
-          id: Date.now(),
-          username: foundUser.username,
-          role: foundUser.role,
-          avatar: 'https://example.com/avatar.jpg',
-          description: foundUser.description
-        }
-        const token = 'mock_token_' + Date.now()
-        
-        userStore.setToken(token)
-        userStore.setUserInfo(userInfo)
-        
-        ElMessage.success('登录成功')
-        
-        // 如果有重定向地址，则跳转到重定向地址
-        const redirect = route.query.redirect
-        router.push(redirect || '/')
-      } catch (error) {
-        ElMessage.error('登录失败：' + error.message)
+const handleLogin = async () => {
+  if (!loginFormRef.value) return
+  
+  try {
+    const valid = await loginFormRef.value.validate()
+    if (!valid) return
+    
+    loading.value = true
+    console.log('发送登录请求:', loginForm.value)
+    
+    const response = await userStore.login(loginForm.value)
+    console.log('登录响应:', response)
+    
+    if (response && response.success) {
+      ElMessage.success('登录成功')
+      const user = userStore.user
+      console.log('当前用户信息:', user)
+      
+      // 根据用户角色决定跳转页面
+      let redirectPath = '/'
+      if (user.role === 'admin') {
+        redirectPath = '/admin/review'
+      } else if (user.role === 'creator') {
+        redirectPath = '/profile'
       }
+      
+      // 如果有重定向地址，优先使用重定向地址
+      const redirect = route.query.redirect
+      router.push(redirect || redirectPath)
+    } else {
+      ElMessage.error(response?.message || '登录失败')
     }
-  })
-}
-
-// 注册处理
-const handleRegister = () => {
-  registerFormRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        // 这里应该调用注册API
-        ElMessage.success('注册成功')
-        activeTab.value = 'login'
-        // 清空注册表单
-        registerForm.username = ''
-        registerForm.email = ''
-        registerForm.password = ''
-        registerForm.confirmPassword = ''
-      } catch (error) {
-        ElMessage.error('注册失败')
-      }
+  } catch (error) {
+    console.error('登录错误:', error)
+    if (error.response) {
+      console.error('错误响应:', error.response)
+      ElMessage.error(error.response.data?.message || '登录失败')
+    } else if (error.request) {
+      console.error('请求错误:', error.request)
+      ElMessage.error('无法连接到服务器，请检查网络连接')
+    } else {
+      console.error('其他错误:', error.message)
+      ElMessage.error(error.message || '登录失败')
     }
-  })
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
 <style scoped>
-.login-page {
-  min-height: calc(100vh - 60px);
+.login-container {
   display: flex;
   justify-content: center;
   align-items: center;
+  min-height: 100vh;
   background-color: #f5f7fa;
-  padding: 20px;
-  min-width: 1200px;
 }
 
-.login-card {
+.login-box {
   width: 400px;
-  min-width: 400px;
-  margin: 0 auto;
+  padding: 40px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
-.card-header {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
+.login-box h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #303133;
 }
 
-.form-actions {
+.login-form {
+  margin-top: 20px;
+}
+
+.remember-forgot {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -280,29 +165,18 @@ const handleRegister = () => {
   margin-bottom: 20px;
 }
 
-.el-form-item {
-  margin-bottom: 20px;
+.register-link {
+  text-align: center;
+  font-size: 14px;
+  color: #606266;
 }
 
-.el-input {
-  --el-input-height: 40px;
+.register-link a {
+  color: #409eff;
+  text-decoration: none;
 }
 
-:deep(.el-input__wrapper) {
-  box-shadow: 0 0 0 1px #dcdfe6 inset;
-}
-
-:deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px #c0c4cc inset;
-}
-
-:deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px #409eff inset;
-}
-
-/* 覆盖Element Plus的响应式样式 */
-:deep(.el-card) {
-  width: 400px !important;
-  min-width: 400px !important;
+.register-link a:hover {
+  text-decoration: underline;
 }
 </style> 

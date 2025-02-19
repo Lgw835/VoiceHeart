@@ -1,5 +1,11 @@
 <template>
   <div class="create-article">
+    <div class="back-button">
+      <el-button @click="goBack" text>
+        <el-icon><ArrowLeft /></el-icon>
+        返回上一页
+      </el-button>
+    </div>
     <div class="editor-container">
       <el-card class="editor-card">
         <!-- 标题输入 -->
@@ -99,7 +105,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import {
   Edit,
   CaretBottom,
@@ -117,7 +123,8 @@ import {
   Monitor,
   Upload,
   Plus,
-  Timer
+  Timer,
+  ArrowLeft
 } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -135,7 +142,8 @@ import Vditor from 'vditor'
 import { useTheme } from '../composables/useTheme'
 
 const router = useRouter()
-const { saveArticleDraft, publishArticle: publishArticleApi } = useArticleApi()
+const route = useRoute()
+const { saveArticleDraft, publishArticle: publishArticleApi, getArticle } = useArticleApi()
 
 // 文章标题
 const articleTitle = ref('')
@@ -184,18 +192,25 @@ const articleSettings = ref({
 
 // 分类和标签数据
 const categories = [
-  { value: 'tech', label: '技术' },
-  { value: 'life', label: '生活' },
-  { value: 'thoughts', label: '随想' },
-  { value: 'other', label: '其他' }
+  { value: '心理', label: '心理' },
+  { value: '情感', label: '情感' },
+  { value: '生活', label: '生活' },
+  { value: '职场', label: '职场' },
+  { value: '知识分享', label: '知识分享' },
+  { value: '迷茫求助', label: '迷茫求助' },
+  { value: '沪上青年', label: '沪上青年' },
+  { value: '活动', label: '活动' },
+  { value: '技术', label: '技术' },
+  { value: '其他', label: '其他' }
 ]
 
 const tags = [
-  { value: 'vue', label: 'Vue' },
-  { value: 'react', label: 'React' },
-  { value: 'javascript', label: 'JavaScript' },
-  { value: 'python', label: 'Python' },
-  { value: 'java', label: 'Java' }
+  { value: '心理咨询', label: '心理咨询' },
+  { value: '情感困惑', label: '情感困惑' },
+  { value: '职业规划', label: '职业规划' },
+  { value: '学习方法', label: '学习方法' },
+  { value: '生活经验', label: '生活经验' },
+  { value: '兴趣爱好', label: '兴趣爱好' }
 ]
 
 // 状态变量
@@ -205,6 +220,44 @@ const lastSaveTime = ref('')
 
 // 编辑器实例
 const vditor = ref(null)
+
+// 是否是编辑模式
+const isEdit = computed(() => Boolean(route.query.id))
+
+// 文章数据
+const articleData = ref(null)
+
+// 返回上一页
+const goBack = () => {
+  router.back()
+}
+
+// 加载文章内容
+const loadArticle = async () => {
+  if (!isEdit.value) return
+  
+  try {
+    const response = await getArticle(route.query.id)
+    if (response.success) {
+      const { article } = response
+      articleData.value = article
+      articleTitle.value = article.title
+      articleSettings.value = {
+        category: article.category,
+        tags: article.tags,
+        coverUrl: article.coverUrl,
+        summary: article.summary
+      }
+      // 如果编辑器已经初始化，则设置内容
+      if (vditor.value) {
+        vditor.value.setValue(article.content)
+      }
+    }
+  } catch (error) {
+    console.error('加载文章失败:', error)
+    ElMessage.error('加载文章失败')
+  }
+}
 
 // 编辑器配置
 const initVditor = () => {
@@ -248,103 +301,24 @@ const initVditor = () => {
           'export',
           'outline',
           'preview',
-          'devtools',
-          'help',
         ],
       },
     ],
-    options: {
-    },
-    counter: {
-      enable: true,
-      type: 'text',
-    },
-    preview: {
-      delay: 500,
-      maxWidth: 1000,
-      mode: 'both',
-      hljs: {
-        enable: true,
-        style: 'github',
-        lineNumber: true,
-      },
-      math: {
-        enable: true,
-        engine: 'KaTeX',
-      },
-      markdown: {
-        toc: true,
-        mark: true,
-        footnotes: true,
-        autoSpace: true,
-        paragraphBeginningSpace: true,
-        fixTermTypo: true,
-      },
-    },
-    hint: {
-      emoji: {
-        '+1': '👍',
-        '-1': '👎',
-        'smile': '😄',
-        'heart': '❤️',
-        'ok_hand': '👌',
-      },
-    },
-    upload: {
-      url: '/api/upload',
-      max: 5 * 1024 * 1024,
-      accept: 'image/*',
-      handler: (files) => {
-        return new Promise((resolve, reject) => {
-          const formData = new FormData()
-          files.forEach((file) => {
-            formData.append('file', file)
-          })
-          
-          fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          })
-            .then((response) => response.json())
-            .then((json) => {
-              resolve(json.data)
-            })
-            .catch((error) => {
-              reject(error)
-            })
-        })
-      },
-    },
     after: () => {
-      if (markdownContent.value) {
-        vditor.value.setValue(markdownContent.value)
+      // 编辑器初始化完成后，如果已有文章数据则设置内容
+      if (articleData.value) {
+        vditor.value.setValue(articleData.value.content)
       }
-    },
-    input: (value) => {
-      markdownContent.value = value
-      handleInput()
-    },
-    focus: (value) => {
-      // 获得焦点时的回调
-    },
-    blur: (value) => {
-      // 失去焦点时的回调
-    },
-    esc: (value) => {
-      // 按下 ESC 键时的回调
-    },
-    ctrlEnter: (value) => {
-      // 按下 Ctrl+Enter 时的回调
-    },
-    select: (value) => {
-      // 选中文本时的回调
-    },
+    }
   })
 }
 
-// 在组件挂载时初始化编辑器
-onMounted(() => {
+// 在组件挂载时初始化编辑器并加载文章
+onMounted(async () => {
   window.addEventListener('beforeunload', handleBeforeUnload)
+  // 先加载文章数据
+  await loadArticle()
+  // 再初始化编辑器
   initVditor()
 })
 
@@ -370,25 +344,37 @@ const handleInput = () => {
 
 // 保存草稿
 const saveDraft = async (isAuto = false) => {
-  if (!articleTitle.value.trim() && !markdownContent.value.trim()) {
+  if (!articleTitle.value.trim()) {
+    ElMessage.warning('请输入文章标题')
     return
   }
 
   try {
     savingDraft.value = true
-    // 这里应该调用API保存草稿
-    const response = await saveArticleDraft({
+    const articleData = {
       title: articleTitle.value,
-      content: markdownContent.value,
+      content: vditor.value.getValue(),
       ...articleSettings.value
-    })
+    }
     
-    lastSaveTime.value = new Date().toLocaleString()
-    if (!isAuto) {
-      ElMessage.success('草稿已保存')
+    if (isEdit.value) {
+      articleData.id = route.query.id
+    }
+
+    const response = await saveArticleDraft(articleData)
+    if (response.success) {
+      ElMessage.success('保存成功')
+      lastSaveTime.value = new Date().toLocaleTimeString()
+      if (!isEdit.value) {
+        // 如果是新建文章，保存后进入编辑模式
+        router.replace({
+          query: { id: response.article._id }
+        })
+      }
     }
   } catch (error) {
-    ElMessage.error('保存失败：' + error.message)
+    console.error('保存失败:', error)
+    ElMessage.error('保存失败')
   } finally {
     savingDraft.value = false
   }
@@ -396,44 +382,31 @@ const saveDraft = async (isAuto = false) => {
 
 // 发布文章
 const publishArticle = async () => {
-  // 表单验证
   if (!articleTitle.value.trim()) {
     ElMessage.warning('请输入文章标题')
     return
   }
-  if (!markdownContent.value.trim()) {
-    ElMessage.warning('请输入文章内容')
-    return
-  }
-  if (!articleSettings.value.category) {
-    ElMessage.warning('请选择文章分类')
-    return
-  }
-  if (articleSettings.value.tags.length === 0) {
-    ElMessage.warning('请至少选择一个标签')
-    return
-  }
 
   try {
-    const confirmResult = await ElMessageBox.confirm(
-      '确定要发布这篇文章吗？发布后将进入审核流程。',
-      '发布确认'
-    )
-    
     publishing.value = true
-    // 这里应该调用API发布文章
-    const response = await publishArticleApi({
+    const articleData = {
       title: articleTitle.value,
-      content: markdownContent.value,
+      content: vditor.value.getValue(),
       ...articleSettings.value
-    })
-    
-    ElMessage.success('文章已提交审核')
-    router.push('/my-articles')
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('发布失败：' + error.message)
     }
+    
+    if (isEdit.value) {
+      articleData.id = route.query.id
+    }
+
+    const response = await publishArticleApi(articleData)
+    if (response.success) {
+      ElMessage.success('发布成功')
+      router.push(`/article/${response.article._id}`)
+    }
+  } catch (error) {
+    console.error('发布失败:', error)
+    ElMessage.error('发布失败')
   } finally {
     publishing.value = false
   }
@@ -734,5 +707,13 @@ const beforeCoverUpload = (file) => {
 
 .color-picker-wrapper:hover {
   border-color: #409eff;
+}
+
+.back-button {
+  margin-bottom: 20px;
+}
+
+.back-button .el-button {
+  font-size: 16px;
 }
 </style> 

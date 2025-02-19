@@ -1,98 +1,81 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
-import { useUserStore } from '@/store/user'
-import TestAccountInit from '@/views/admin/TestAccountInit.vue'
 import { ElMessage } from 'element-plus'
-
-const routes = [
-  {
-    path: '/',
-    name: 'Home',
-    component: Home
-  },
-  {
-    path: '/category/:id',
-    name: 'Category',
-    component: Home
-  },
-  {
-    path: '/article/:id',
-    name: 'ArticleDetail',
-    component: () => import('../views/ArticleDetail.vue')
-  },
-  {
-    path: '/create',
-    name: 'CreateArticle',
-    component: () => import('../views/CreateArticle.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/login',
-    name: 'Login',
-    component: () => import('../views/Login.vue')
-  },
-  {
-    path: '/user/profile',
-    name: 'UserProfile',
-    component: () => import('../views/UserProfile.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/admin/test-accounts',
-    name: 'TestAccountInit',
-    component: TestAccountInit,
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: true
-    }
-  },
-  {
-    path: '/admin/review',
-    name: 'Review',
-    component: () => import('../views/admin/Review.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: true
-    }
-  },
-  {
-    path: '/books',
-    name: 'BookList',
-    component: () => import('../views/BookList.vue')
-  },
-  {
-    path: '/books/read',
-    name: 'BookReader',
-    component: () => import('../views/BookReader.vue')
-  }
-]
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes: [
+    {
+      path: '/',
+      name: 'Home',
+      component: () => import('../views/Home.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/login',
+      name: 'Login',
+      component: () => import('../views/Login.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/register',
+      name: 'Register',
+      component: () => import('../views/Register.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/profile',
+      name: 'UserProfile',
+      component: () => import('../views/UserProfile.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/create-article',
+      name: 'CreateArticle',
+      component: () => import('../views/CreateArticle.vue'),
+      meta: { requiresAuth: true, roles: ['creator', 'admin'] }
+    },
+    {
+      path: '/article/:id',
+      name: 'ArticleDetail',
+      component: () => import('../views/ArticleDetail.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/admin/review',
+      name: 'Review',
+      component: () => import('../views/admin/Review.vue'),
+      meta: { requiresAuth: true, roles: ['admin'] }
+    },
+    {
+      path: '/category/:id',
+      name: 'Category',
+      component: () => import('../views/Category.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/books',
+      name: 'Books',
+      component: () => import('../views/Books.vue'),
+      meta: { requiresAuth: false }
+    }
+  ]
 })
 
-// 路由守卫
+// 导航守卫
 router.beforeEach((to, from, next) => {
-  const userStore = useUserStore()
-  
-  if (to.meta.requiresAuth && !userStore.isLoggedIn) {
+  const token = localStorage.getItem('token')
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+
+  if (to.meta.requiresAuth && !token) {
     // 需要登录但未登录，重定向到登录页
     next({
       path: '/login',
       query: { redirect: to.fullPath }
     })
+  } else if (to.meta.roles && !to.meta.roles.includes(user.role)) {
+    // 需要特定角色但没有权限，重定向到首页
+    next({ path: '/' })
   } else {
-    // 检查是否需要管理员权限
-    if (to.matched.some(record => record.meta.requiresAdmin)) {
-      const isAdmin = userStore.userInfo?.role === 'admin'
-      
-      if (!isAdmin) {
-        ElMessage.error('需要管理员权限')
-        next('/')
-        return
-      }
-    }
     next()
   }
 })

@@ -1,32 +1,89 @@
 import { defineStore } from 'pinia'
+import { userApi } from '../api/userApi'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
     token: localStorage.getItem('token') || '',
-    userInfo: JSON.parse(localStorage.getItem('userInfo')) || null
+    user: JSON.parse(localStorage.getItem('user') || '{}'),
+    loading: false
   }),
   
   getters: {
     isLoggedIn: (state) => !!state.token,
-    username: (state) => state.userInfo?.username
+    isCreator: (state) => state.user.role === 'creator',
+    isAdmin: (state) => state.user.role === 'admin',
+    userRole: (state) => state.user.role || 'guest'
   },
   
   actions: {
-    setToken(token) {
-      this.token = token
-      localStorage.setItem('token', token)
+    async login(credentials) {
+      try {
+        this.loading = true
+        const response = await userApi.login(credentials)
+        this.setUserData(response)
+        return response
+      } finally {
+        this.loading = false
+      }
     },
     
-    setUserInfo(userInfo) {
-      this.userInfo = userInfo
-      localStorage.setItem('userInfo', JSON.stringify(userInfo))
+    async register(userData) {
+      try {
+        this.loading = true
+        const response = await userApi.register(userData)
+        return response
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    async updateProfile(userData) {
+      try {
+        this.loading = true
+        const response = await userApi.updateProfile(userData)
+        if (response.success) {
+          this.user = response.user
+          localStorage.setItem('user', JSON.stringify(response.user))
+        }
+        return response
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    async fetchCurrentUser() {
+      try {
+        this.loading = true
+        const response = await userApi.getCurrentUser()
+        if (response.success) {
+          this.user = response.user
+          localStorage.setItem('user', JSON.stringify(response.user))
+        }
+        return response
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    setUserData(data) {
+      if (data.success) {
+        this.token = data.token
+        this.user = data.user
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('user', JSON.stringify(data.user))
+      }
     },
     
     logout() {
       this.token = ''
-      this.userInfo = null
+      this.user = {}
       localStorage.removeItem('token')
-      localStorage.removeItem('userInfo')
+      localStorage.removeItem('user')
+      userApi.logout()
+    },
+    
+    clearError() {
+      this.error = null
     }
   }
 }) 

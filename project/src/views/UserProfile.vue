@@ -1,244 +1,274 @@
 <template>
-  <div class="user-profile">
-    <!-- 用户基本信息卡片 -->
-    <el-card class="profile-card">
+  <div class="profile-container">
+    <!-- 用户信息卡片 -->
+    <el-card class="user-card">
       <div class="user-info">
-        <div class="avatar-wrapper">
-          <el-avatar :size="100" :src="userInfo.avatar" />
-          <div v-if="isEditing" class="avatar-upload">
-            <el-upload
-              class="avatar-uploader"
-              action="/api/upload/avatar"
-              :show-file-list="false"
-              :on-success="handleAvatarSuccess"
-              :before-upload="beforeAvatarUpload"
-              :headers="{ Authorization: `Bearer ${userStore.token}` }"
-            >
-              <el-button size="small" type="primary">更换头像</el-button>
-            </el-upload>
+        <el-avatar :size="80" :src="userInfo.avatar" />
+        <div class="info-content">
+          <h2>{{ userInfo.username }}</h2>
+          <p class="bio">{{ userInfo.bio || '这个人很懒，什么都没写~' }}</p>
+          <div class="stats">
+            <div class="stat-item">
+              <div class="number">{{ userInfo.stats?.articles || 0 }}</div>
+              <div class="label">文章</div>
+            </div>
+            <div class="stat-item">
+              <div class="number">{{ userInfo.stats?.followers || 0 }}</div>
+              <div class="label">关注者</div>
+            </div>
+            <div class="stat-item">
+              <div class="number">{{ userInfo.stats?.following || 0 }}</div>
+              <div class="label">关注</div>
+            </div>
           </div>
         </div>
-        <div class="info-content">
-          <template v-if="!isEditing">
-            <h2>{{ userInfo.username }}</h2>
-            <p>{{ userInfo.bio || '这个人很懒，还没有写简介' }}</p>
-            <el-button type="primary" @click="startEditing">编辑资料</el-button>
-          </template>
-          <template v-else>
-            <el-form
-              ref="formRef"
-              :model="editForm"
-              :rules="formRules"
-              label-width="80px"
-            >
-              <el-form-item label="用户名" prop="username">
-                <el-input v-model="editForm.username" maxlength="20" show-word-limit />
-              </el-form-item>
-              <el-form-item label="简介" prop="bio">
-                <el-input
-                  v-model="editForm.bio"
-                  type="textarea"
-                  :rows="3"
-                  maxlength="200"
-                  show-word-limit
-                  placeholder="写点什么介绍自己吧..."
-                />
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="saveProfile" :loading="saving">保存</el-button>
-                <el-button @click="cancelEdit">取消</el-button>
-              </el-form-item>
-            </el-form>
-          </template>
-        </div>
+        <el-button v-if="isCurrentUser" @click="handleEdit">编辑资料</el-button>
       </div>
     </el-card>
 
-    <!-- 文章列表标签页 -->
-    <el-tabs v-model="activeTab" class="profile-tabs" @tab-click="handleTabClick">
-      <el-tab-pane label="我的文章" name="myArticles">
-        <article-list
-          :articles="myArticles"
-          :loading="loading"
-          @load-more="loadMoreMyArticles"
-        />
-      </el-tab-pane>
-      <el-tab-pane label="收藏的文章" name="favorites">
-        <article-list
-          :articles="favoriteArticles"
-          :loading="loading"
-          @load-more="loadMoreFavorites"
-        />
-      </el-tab-pane>
-    </el-tabs>
+    <!-- 内容区域 -->
+    <div class="content-area">
+      <el-tabs v-model="activeTab" class="profile-tabs">
+        <el-tab-pane label="我的文章" name="articles">
+          <div v-loading="loading.articles" class="articles-grid">
+            <article-card
+              v-for="article in articles"
+              :key="article._id"
+              :article="article"
+              :is-from-my-articles="true"
+              @article-deleted="handleArticleDeleted"
+            />
+            <div v-if="articles.length === 0" class="empty-state">
+              <el-empty description="暂无文章" />
+              <el-button type="primary" @click="router.push('/create-article')">
+                写文章
+              </el-button>
+            </div>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="收藏的文章" name="favorites">
+          <div v-loading="loading.favorites" class="articles-grid">
+            <article-card
+              v-for="article in favorites"
+              :key="article._id"
+              :article="article"
+              :is-from-my-articles="false"
+            />
+            <el-empty v-if="favorites.length === 0" description="暂无收藏" />
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
+
+    <!-- 编辑资料对话框 -->
+    <el-dialog
+      v-model="editDialogVisible"
+      title="编辑个人资料"
+      width="500px"
+    >
+      <el-form
+        ref="editFormRef"
+        :model="editForm"
+        :rules="editRules"
+        label-width="80px"
+      >
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="editForm.username" />
+        </el-form-item>
+        <el-form-item label="头像">
+          <el-upload
+            class="avatar-uploader"
+            action="/api/upload"
+            :show-file-list="false"
+            :on-success="handleAvatarSuccess"
+            :before-upload="beforeAvatarUpload"
+          >
+            <img v-if="editForm.avatar" :src="editForm.avatar" class="avatar" />
+            <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="个人简介" prop="bio">
+          <el-input
+            v-model="editForm.bio"
+            type="textarea"
+            :rows="3"
+            maxlength="200"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="editDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitEdit" :loading="loading.edit">
+            确定
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { useUserStore } from '@/store/user'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '../store/user'
 import { ElMessage } from 'element-plus'
-import ArticleList from '@/components/ArticleList.vue'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+const { Plus } = ElementPlusIconsVue
+import ArticleCard from '../components/ArticleCard.vue'
+import { userApi } from '../api/userApi'
 
+const router = useRouter()
 const userStore = useUserStore()
-const formRef = ref(null)
-const isEditing = ref(false)
-const activeTab = ref('myArticles')
-const loading = ref(false)
-const saving = ref(false)
+const activeTab = ref('articles')
+const editDialogVisible = ref(false)
+const editFormRef = ref(null)
 
-// 分页参数
-const pageSize = 10
-const currentPage = ref(1)
+const loading = ref({
+  articles: false,
+  favorites: false,
+  edit: false
+})
 
-// 表单验证规则
-const formRules = {
+const articles = ref([])
+const favorites = ref([])
+
+const userInfo = computed(() => userStore.user)
+const isCurrentUser = computed(() => true) // 暂时只显示当前用户的个人中心
+
+const editForm = ref({
+  username: '',
+  avatar: '',
+  bio: ''
+})
+
+const editRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
     { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
   ],
   bio: [
-    { max: 200, message: '简介不能超过200个字符', trigger: 'blur' }
+    { max: 200, message: '不能超过200个字符', trigger: 'blur' }
   ]
 }
 
-// 用户信息
-const userInfo = reactive({
-  username: userStore.user?.username || '',
-  bio: userStore.user?.bio || '',
-  avatar: userStore.user?.avatar || ''
-})
-
-// 编辑表单
-const editForm = reactive({
-  username: userInfo.username,
-  bio: userInfo.bio
-})
-
-// 文章列表数据
-const myArticles = ref([])
-const favoriteArticles = ref([])
-const hasMore = ref(true)
-
-// 开始编辑
-const startEditing = () => {
-  editForm.username = userInfo.username
-  editForm.bio = userInfo.bio
-  isEditing.value = true
+// 获取用户文章列表
+const fetchUserArticles = async () => {
+  try {
+    loading.value.articles = true
+    const response = await userApi.getUserArticles(userInfo.value.id)
+    if (response.success) {
+      articles.value = response.articles
+    } else {
+      ElMessage.error(response.message || '获取文章列表失败')
+    }
+  } catch (error) {
+    console.error('获取文章列表错误:', error)
+    ElMessage.error('获取文章列表失败')
+  } finally {
+    loading.value.articles = false
+  }
 }
 
-// 取消编辑
-const cancelEdit = () => {
-  formRef.value?.resetFields()
-  isEditing.value = false
+// 获取收藏列表
+const fetchFavorites = async () => {
+  try {
+    loading.value.favorites = true
+    const response = await userApi.getFavorites()
+    if (response.success) {
+      favorites.value = response.favorites.map(fav => fav.articleId)
+    } else {
+      ElMessage.error('获取收藏列表失败')
+    }
+  } catch (error) {
+    console.error('获取收藏列表错误:', error)
+    ElMessage.error('获取收藏列表失败')
+  } finally {
+    loading.value.favorites = false
+  }
+}
+
+// 打开编辑对话框
+const handleEdit = () => {
+  editForm.value = {
+    username: userInfo.value.username,
+    avatar: userInfo.value.avatar,
+    bio: userInfo.value.bio
+  }
+  editDialogVisible.value = true
 }
 
 // 头像上传前的验证
 const beforeAvatarUpload = (file) => {
-  const isImage = file.type.startsWith('image/')
+  const isJPG = file.type === 'image/jpeg' || file.type === 'image/png'
   const isLt2M = file.size / 1024 / 1024 < 2
 
-  if (!isImage) {
-    ElMessage.error('只能上传图片文件！')
-    return false
+  if (!isJPG) {
+    ElMessage.error('头像只能是 JPG 或 PNG 格式!')
   }
   if (!isLt2M) {
-    ElMessage.error('图片大小不能超过 2MB！')
-    return false
+    ElMessage.error('头像大小不能超过 2MB!')
   }
-  return true
+  return isJPG && isLt2M
 }
 
 // 头像上传成功的回调
 const handleAvatarSuccess = (response) => {
-  userInfo.avatar = response.url
-  ElMessage.success('头像更新成功')
+  if (response.success) {
+    editForm.value.avatar = response.url
+  } else {
+    ElMessage.error('头像上传失败')
+  }
 }
 
-// 保存个人资料
-const saveProfile = async () => {
-  if (!formRef.value) return
+// 提交编辑
+const submitEdit = async () => {
+  if (!editFormRef.value) return
   
   try {
-    await formRef.value.validate()
-    saving.value = true
-    await userStore.updateProfile(editForm)
-    Object.assign(userInfo, editForm)
-    isEditing.value = false
-    ElMessage.success('保存成功')
-  } catch (error) {
-    if (error.message) {
-      ElMessage.error('保存失败：' + error.message)
+    const valid = await editFormRef.value.validate()
+    if (!valid) return
+
+    loading.value.edit = true
+    const response = await userApi.updateProfile(editForm.value)
+    
+    if (response.success) {
+      ElMessage.success('更新成功')
+      editDialogVisible.value = false
+      // 更新用户信息
+      await userStore.fetchCurrentUser()
+    } else {
+      ElMessage.error(response.message || '更新失败')
     }
-  } finally {
-    saving.value = false
-  }
-}
-
-// 处理标签页切换
-const handleTabClick = () => {
-  currentPage.value = 1
-  if (activeTab.value === 'myArticles') {
-    myArticles.value = []
-    loadMoreMyArticles()
-  } else {
-    favoriteArticles.value = []
-    loadMoreFavorites()
-  }
-}
-
-// 加载我的文章
-const loadMoreMyArticles = async () => {
-  if (loading.value || !hasMore.value) return
-  loading.value = true
-  try {
-    const response = await fetch(
-      `/api/articles?userId=${userStore.user.id}&page=${currentPage.value}&pageSize=${pageSize}`
-    )
-    const data = await response.json()
-    myArticles.value.push(...data.articles)
-    hasMore.value = data.articles.length === pageSize
-    currentPage.value++
   } catch (error) {
-    ElMessage.error('加载文章失败：' + error.message)
+    console.error('更新个人资料错误:', error)
+    ElMessage.error('更新失败')
   } finally {
-    loading.value = false
+    loading.value.edit = false
   }
 }
 
-// 加载收藏的文章
-const loadMoreFavorites = async () => {
-  if (loading.value || !hasMore.value) return
-  loading.value = true
-  try {
-    const response = await fetch(
-      `/api/favorites?userId=${userStore.user.id}&page=${currentPage.value}&pageSize=${pageSize}`
-    )
-    const data = await response.json()
-    favoriteArticles.value.push(...data.articles)
-    hasMore.value = data.articles.length === pageSize
-    currentPage.value++
-  } catch (error) {
-    ElMessage.error('加载收藏失败：' + error.message)
-  } finally {
-    loading.value = false
-  }
+// 处理文章删除
+const handleArticleDeleted = (articleId) => {
+  articles.value = articles.value.filter(article => article._id !== articleId)
 }
 
-// 初始化数据
 onMounted(() => {
-  loadMoreMyArticles()
+  fetchUserArticles()
+  fetchFavorites()
 })
 </script>
 
 <style scoped>
-.user-profile {
+.profile-container {
   max-width: 1200px;
-  margin: 20px auto;
-  padding: 0 20px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
-.profile-card {
+.user-card {
   margin-bottom: 20px;
 }
 
@@ -248,30 +278,94 @@ onMounted(() => {
   gap: 20px;
 }
 
-.avatar-wrapper {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.avatar-upload {
-  text-align: center;
-}
-
 .info-content {
   flex: 1;
 }
 
-.profile-tabs {
-  background: #fff;
-  padding: 20px;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+.info-content h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 600;
 }
 
-.el-form {
-  max-width: 500px;
+.bio {
+  color: #606266;
+  margin: 0 0 16px;
+}
+
+.stats {
+  display: flex;
+  gap: 40px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.number {
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.label {
+  font-size: 14px;
+  color: #909399;
+}
+
+.content-area {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  min-height: 500px;
+}
+
+.articles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+}
+
+.empty-state .el-button {
+  margin-top: 20px;
+}
+
+.avatar-uploader {
+  text-align: center;
+}
+
+.avatar-uploader .el-upload {
+  border: 1px dashed #d9d9d9;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: var(--el-transition-duration-fast);
+}
+
+.avatar-uploader .el-upload:hover {
+  border-color: var(--el-color-primary);
+}
+
+.avatar-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 100px;
+  height: 100px;
+  text-align: center;
+  line-height: 100px;
+}
+
+.avatar {
+  width: 100px;
+  height: 100px;
+  display: block;
+  object-fit: cover;
 }
 </style> 
